@@ -1,4 +1,5 @@
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -7,8 +8,10 @@ from .serializers import NoteSerializer
 
 
 class NoteListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        notes = Note.objects.select_related("user").all()
+        notes = Note.objects.select_related("user").filter(user=request.user)
         serializer = NoteSerializer(notes, many=True)
         return Response(serializer.data)
 
@@ -16,27 +19,27 @@ class NoteListView(APIView):
         serializer = NoteSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        user = request.user if request.user.is_authenticated else None
-        serializer.save(user=user)
+        serializer.save(user=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class NoteDetailView(APIView):
-    def _get_note(self, pk):
+    permission_classes = [IsAuthenticated]
+
+    def _get_note(self, pk, user):
         try:
-            return Note.objects.select_related("user").get(pk=pk)
+            return Note.objects.select_related("user").get(pk=pk, user=user)
         except Note.DoesNotExist:
             return None
 
     def get(self, request, pk):
-        note = self._get_note(pk)
+        note = self._get_note(pk, request.user)
         if note is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = NoteSerializer(note)
-        return Response(serializer.data)
+        return Response(NoteSerializer(note).data)
 
     def put(self, request, pk):
-        note = self._get_note(pk)
+        note = self._get_note(pk, request.user)
         if note is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = NoteSerializer(note, data=request.data)
@@ -46,7 +49,7 @@ class NoteDetailView(APIView):
         return Response(serializer.data)
 
     def patch(self, request, pk):
-        note = self._get_note(pk)
+        note = self._get_note(pk, request.user)
         if note is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = NoteSerializer(note, data=request.data, partial=True)
@@ -56,7 +59,7 @@ class NoteDetailView(APIView):
         return Response(serializer.data)
 
     def delete(self, request, pk):
-        note = self._get_note(pk)
+        note = self._get_note(pk, request.user)
         if note is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         note.delete()
