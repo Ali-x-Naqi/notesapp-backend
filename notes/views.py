@@ -8,7 +8,7 @@ from .serializers import NoteSerializer
 
 class NoteListView(APIView):
     def get(self, request):
-        notes = Note.objects.all()
+        notes = Note.objects.select_related("user").all()
         serializer = NoteSerializer(notes, many=True)
         return Response(serializer.data)
 
@@ -16,14 +16,15 @@ class NoteListView(APIView):
         serializer = NoteSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
+        user = request.user if request.user.is_authenticated else None
+        serializer.save(user=user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class NoteDetailView(APIView):
     def _get_note(self, pk):
         try:
-            return Note.objects.get(pk=pk)
+            return Note.objects.select_related("user").get(pk=pk)
         except Note.DoesNotExist:
             return None
 
