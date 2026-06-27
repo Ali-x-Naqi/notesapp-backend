@@ -64,3 +64,56 @@ Log of AI prompts used during Week 2 backend development.
 - Confirmed all URL names (`note-list`, `note-detail`) match the names in `notes/urls.py`.
 - Confirmed `client` is the built-in pytest-django fixture — no custom setup needed.
 - All 14 tests pass: `pytest --tb=short` → 14 passed in 1.16s.
+
+---
+
+## Week 3 — Auth, Authorization, API Tests & Integration
+
+### PR1: JWT Authentication
+
+**Prompt:**
+> Add JWT authentication to the Django backend using djangorestframework-simplejwt. Create a users app with POST /api/auth/register/ that accepts username, email, password, password_confirm, creates the user with create_user() (hashes the password), and returns access + refresh tokens. Wire simplejwt's TokenObtainPairView to POST /api/auth/token/ and TokenRefreshView to POST /api/auth/token/refresh/. Set DEFAULT_AUTHENTICATION_CLASSES to JWTAuthentication and DEFAULT_PERMISSION_CLASSES to IsAuthenticated. Configure CORS for localhost:3000 using django-cors-headers. Update notes views to require auth and filter notes by request.user.
+
+**What I verified:**
+- Checked that `create_user()` is called (not `create()`) — passwords are hashed, never stored plain.
+- Confirmed `CorsMiddleware` is placed before `SecurityMiddleware` in MIDDLEWARE (required by django-cors-headers docs).
+- Confirmed `RegisterView.permission_classes = [AllowAny]` so unauthenticated users can register.
+- Confirmed `SIMPLE_JWT` import of `timedelta` is at the top of settings.py (not mid-file) to pass ruff E402.
+- Updated all 10 view tests to use `APIClient().force_authenticate()` since auth is now required — 15/15 passing.
+
+---
+
+### PR2: Role-Based Authorization
+
+**Prompt:**
+> Add a UserProfile model with a role field (choices: user/admin) using a OneToOne relationship to Django's User. Use a post_save signal to auto-create a profile for every new user. Create a custom DRF permission class IsOwnerOrAdmin: admin users can access any note, regular users only access their own. Apply this permission to NoteDetailView using check_object_permissions. In NoteListView, return all notes for admin users and only own notes for regular users.
+
+**What I reviewed and corrected:**
+- Verified the signal uses `if created:` guard to avoid overwriting profiles on User updates.
+- Checked that `check_object_permissions` is called after the 404 check — DRF requires this explicit call in APIView (unlike ViewSets where it's automatic).
+- Confirmed 403 is returned (not 404) when a regular user tries to access another user's note — this matches the permission system behavior.
+- Ran `makemigrations users` — confirmed migration `0001_initial.py` creates the UserProfile table.
+
+---
+
+### PR3: API Tests (5+ covering auth + CRUD + error paths)
+
+**Prompt:**
+> Write pytest tests for the auth and CRUD endpoints. Cover: register returns 201 with tokens, register password mismatch returns 400, login valid credentials returns tokens, login invalid returns 401, unauthenticated notes access returns 401, authenticated user can create note 201, user cannot access another user's note 403, admin can access any note 200, admin sees all notes in list, delete non-existent note 404. Use APIClient with force_authenticate and a separate admin fixture.
+
+**What I reviewed and corrected:**
+- Confirmed admin fixture sets `profile.role = UserProfile.ROLE_ADMIN` and saves — the signal creates a `user` role profile by default, so this update is needed.
+- Verified all URL names match (`auth-register`, `auth-token`, `note-list`, `note-detail`).
+- All 25 tests pass: `pytest --tb=short` → 25 passed in 49.30s (JWT signing is slow in tests; acceptable).
+
+---
+
+### PR4: Integration Test (happy path end-to-end)
+
+**Prompt:**
+> Write a single integration test that exercises the full lifecycle: Register a new user, authenticate with the returned JWT access token, Create a note (POST), Read the note (GET), Update it (PATCH), Delete it (DELETE), then confirm deletion returns 404. Use real SQLite in-memory DB — no mocks. All steps in one test function so any regression in any layer surfaces immediately.
+
+**What I reviewed and corrected:**
+- Confirmed `client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")` correctly sets the header for all subsequent requests.
+- Verified each step asserts the correct status code before moving to the next — the test fails fast and clearly if any step breaks.
+- Test passes in 3.51s — fast enough for CI.
