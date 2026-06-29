@@ -20,18 +20,18 @@ def _make_tool_call(call_id, name, arguments):
 
 
 def test_web_search_returns_formatted_results():
-    mock_client = MagicMock()
-    mock_client.search.return_value = {
-        "results": [
+    mock_search_instance = MagicMock()
+    mock_search_instance.get_dict.return_value = {
+        "organic_results": [
             {
                 "title": "Example Title",
-                "url": "https://example.com",
-                "content": "An example result.",
+                "link": "https://example.com",
+                "snippet": "An example result.",
             }
         ]
     }
 
-    with patch("agent.skills.web_search.TavilyClient", return_value=mock_client):
+    with patch("agent.skills.web_search.GoogleSearch", return_value=mock_search_instance):
         with patch("agent.skills.web_search.config", return_value="fake-key"):
             result = web_search("test query")
 
@@ -41,10 +41,10 @@ def test_web_search_returns_formatted_results():
 
 
 def test_web_search_handles_api_error():
-    mock_client = MagicMock()
-    mock_client.search.side_effect = Exception("connection error")
+    mock_search_instance = MagicMock()
+    mock_search_instance.get_dict.side_effect = Exception("connection error")
 
-    with patch("agent.skills.web_search.TavilyClient", return_value=mock_client):
+    with patch("agent.skills.web_search.GoogleSearch", return_value=mock_search_instance):
         with patch("agent.skills.web_search.config", return_value="fake-key"):
             result = web_search("test query")
 
@@ -55,7 +55,7 @@ def test_web_search_missing_api_key():
     with patch("agent.skills.web_search.config", return_value=""):
         result = web_search("test query")
 
-    assert "TAVILY_API_KEY" in result
+    assert "SERPAPI_KEY" in result
 
 
 # --- ResearchAgent tests ---
