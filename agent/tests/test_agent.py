@@ -2,8 +2,8 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from agent.skills.web_search import web_search
 from agent.agent import ResearchAgent
+from agent.skills.web_search import web_search
 
 
 def _make_choice(finish_reason, content=None, tool_calls=None):
