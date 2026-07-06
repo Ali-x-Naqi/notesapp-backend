@@ -6,10 +6,18 @@ from groq import Groq
 
 from agent.hooks import log_post, log_pre
 from agent.memory import SessionMemory
+from agent.skills.file_read import FILE_READ_TOOL, file_read
 from agent.skills.web_search import WEB_SEARCH_TOOL, web_search
 
 MAX_ITERATIONS = 5
 MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+TOOLS = [WEB_SEARCH_TOOL, FILE_READ_TOOL]
+
+TOOL_FUNCTIONS = {
+    "web_search": lambda args: web_search(args.get("query", "")),
+    "file_read": lambda args: file_read(args.get("path", "")),
+}
 
 
 class ResearchAgent:
@@ -30,7 +38,7 @@ class ResearchAgent:
             response = self.client.chat.completions.create(
                 model=MODEL,
                 messages=messages,
-                tools=[WEB_SEARCH_TOOL],
+                tools=TOOLS,
                 tool_choice="auto",
             )
 
@@ -50,8 +58,13 @@ class ResearchAgent:
 
             for tool_call in tool_calls:
                 args = json.loads(tool_call.function.arguments)
+                tool_fn = TOOL_FUNCTIONS.get(tool_call.function.name)
                 start = log_pre(tool_call.function.name, args)
-                result = web_search(args.get("query", ""))
+                result = (
+                    tool_fn(args)
+                    if tool_fn is not None
+                    else f"Error: unknown tool '{tool_call.function.name}'"
+                )
                 log_post(tool_call.function.name, result, start)
                 messages.append(
                     {
