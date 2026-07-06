@@ -116,4 +116,76 @@ Log of AI prompts used during Week 2 backend development.
 **What I reviewed and corrected:**
 - Confirmed `client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")` correctly sets the header for all subsequent requests.
 - Verified each step asserts the correct status code before moving to the next — the test fails fast and clearly if any step breaks.
+
+---
+
+## Week 4 — Agent Concepts: Skills, Hooks, Memory & Plugins
+
+### PR13: Research Agent with Web-Search Skill
+
+**Prompt:**
+> Build a ResearchAgent class using the Groq SDK with a raw tool-use loop (no LangChain). Give it a web_search skill backed by SerpAPI. The agent should send the user's question to the model, and if the model requests a tool call, execute web_search and feed the result back as a `role: tool` message, looping until the model returns a final answer or a max-iteration limit is hit.
+
+**What I reviewed and corrected:**
+- Switched model from `llama-3.3-70b-versatile` to `meta-llama/llama-4-scout-17b-16e-instruct` after hitting a tool-call format bug on the first model.
+- Confirmed `MAX_ITERATIONS = 5` prevents an infinite loop if the model keeps requesting tools without ever finishing.
+- Verified `web_search` returns error strings (not exceptions) for missing API key / API failure, since the LLM reads the tool result as plain text.
+
+---
+
+### PR14: Agent Memory Layer
+
+**Prompt:**
+> Add a SessionMemory class that stores question/answer pairs from the current session. It should expose get_context() to build a system-prompt string summarizing prior Q&A, so the agent can recall facts it already answered earlier in the same session.
+
+**What I reviewed and corrected:**
+- Confirmed `get_context()` returns an empty string (not a placeholder) when there are no entries yet, so the agent doesn't inject a useless system message on the first question.
+- Verified `agent.run()` only calls `memory.add()` when the model reaches `finish_reason == "stop"` with a non-empty answer — not on every loop iteration.
+
+---
+
+### PR15: Swagger API Documentation
+
+**Prompt:**
+> Add drf-spectacular to auto-generate Swagger/OpenAPI docs for the existing DRF views, with a browsable UI at /api/docs/. Annotate views with @extend_schema where the auto-detected schema isn't accurate.
+
+**What I reviewed and corrected:**
+- Confirmed `SPECTACULAR_SETTINGS` in `settings.py` doesn't conflict with the existing JWT auth scheme — verified `/api/docs/` renders and lists all notes/auth endpoints correctly.
+- Checked `@extend_schema` annotations on views that use Pydantic-first validation, since drf-spectacular can't infer those from the serializer alone.
+
+---
+
+### PR16: Tool-Call Logging Hook
+
+**Prompt:**
+> Add a hooks.py with log_pre() and log_post() functions that fire before and after every tool call in the agent's loop. Log timestamp, tool name, input, duration, and output length to a file (agent/tool_calls.log, gitignored).
+
+**What I reviewed and corrected:**
+- Confirmed `tool_calls.log` is added to `.gitignore` since it's a runtime artifact, not source.
+- Verified `log_post` computes `duration` using `time.monotonic()` (not `time.time()`), since monotonic clocks aren't affected by system clock adjustments.
+- Wrote 3 tests in `test_hooks.py` using `tmp_path` so tests don't pollute the real log file.
+
+---
+
+### PR17: File-Read Plugin
+
+**Prompt:**
+> Add a file_read skill: a FILE_READ_TOOL definition and file_read(path) function that reads .txt files with Python's open() and .pdf files with the pypdf package, returning the extracted text (or a clear error string for missing files / unsupported extensions / corrupt PDFs). Wire it into the agent's tool list.
+
+**What I reviewed and corrected:**
+- Found and fixed a real bug while wiring this in: the agent's dispatch loop was hardcoded to always call `web_search`, ignoring which tool the model actually requested. Replaced it with a `TOOL_FUNCTIONS` dict keyed by `tool_call.function.name` so each tool call routes to the correct function.
+- Verified `page.extract_text()` can return `None` for image-only PDF pages, guarded with `or ""` before joining pages so it doesn't crash.
+- Mocked `PdfReader` in tests (same pattern as mocking `GoogleSearch` for web_search) instead of shipping a binary PDF fixture.
+
+---
+
+### PR18: Multi-Hop Demo
+
+**Prompt:**
+> Write a demo script showing a single agent answering a multi-hop question that requires file_read -> web_search -> memory.add -> answer, with every tool call visible in tool_calls.log.
+
+**What I reviewed and corrected:**
+- Designed the prompt sent to the agent to explicitly require reading a file first to discover a topic, then searching the web on that topic, so the multi-hop chain is forced rather than incidental.
+- Confirmed `memory.add()` fires automatically inside `agent.run()` — the demo doesn't need to call it directly, it just needs to reach a final `stop` response.
+- Split this into its own PR (chained after PR17) instead of bundling with the file-read plugin, per the one-assignment-per-PR rule.
 - Test passes in 3.51s — fast enough for CI.
