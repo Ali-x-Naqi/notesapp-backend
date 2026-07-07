@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from decouple import config
 from groq import Groq
@@ -13,8 +14,10 @@ MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 WORKER_TOOLS = [RESEARCH_WORKER_TOOL, NOTES_WORKER_TOOL]
 
 WORKER_FUNCTIONS = {
-    "research_worker": lambda args: research_worker(args.get("question", "")),
-    "notes_worker": lambda args: notes_worker(
+    "research_worker": lambda args, run_id: research_worker(
+        args.get("question", ""), run_id=run_id
+    ),
+    "notes_worker": lambda args, run_id: notes_worker(
         action=args.get("action", ""),
         username=args.get("username", ""),
         title=args.get("title", ""),
@@ -32,8 +35,12 @@ SYSTEM_PROMPT = (
 class SupervisorAgent:
     def __init__(self) -> None:
         self.client = Groq(api_key=config("GROQ_API_KEY"))
+        self.last_run_id: str | None = None
 
     def run(self, task: str) -> str:
+        run_id = uuid.uuid4().hex[:8]
+        self.last_run_id = run_id
+
         messages: list[dict] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": task},
@@ -61,13 +68,13 @@ class SupervisorAgent:
             for tool_call in tool_calls:
                 args = json.loads(tool_call.function.arguments)
                 worker_fn = WORKER_FUNCTIONS.get(tool_call.function.name)
-                start = log_pre(tool_call.function.name, args)
+                start = log_pre(tool_call.function.name, args, run_id=run_id)
                 result = (
-                    worker_fn(args)
+                    worker_fn(args, run_id)
                     if worker_fn is not None
                     else f"Error: unknown worker '{tool_call.function.name}'"
                 )
-                log_post(tool_call.function.name, result, start)
+                log_post(tool_call.function.name, result, start, run_id=run_id)
                 messages.append(
                     {
                         "role": "tool",

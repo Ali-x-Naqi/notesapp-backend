@@ -1,6 +1,6 @@
 import json
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from agents.supervisor import SupervisorAgent
 
@@ -50,7 +50,10 @@ def test_supervisor_routes_to_research_worker(mock_research, mock_groq_cls, mock
     result = supervisor.run("What is the capital of France?")
 
     assert "Paris" in result
-    mock_research.assert_called_once_with("What is the capital of France?")
+    mock_research.assert_called_once_with("What is the capital of France?", run_id=ANY)
+    actual_run_id = mock_research.call_args.kwargs["run_id"]
+    assert actual_run_id == supervisor.last_run_id
+    assert isinstance(actual_run_id, str) and actual_run_id
 
 
 @patch("agents.supervisor.config", return_value="fake-groq-key")

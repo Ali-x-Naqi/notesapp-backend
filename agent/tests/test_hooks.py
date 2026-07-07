@@ -36,3 +36,19 @@ def test_logs_append_not_overwrite(tmp_path):
         log_post("web_search", "result2", start2)
         lines = log_file.read_text().strip().split("\n")
     assert len(lines) == 4
+
+
+def test_log_pre_includes_run_id_when_provided(tmp_path):
+    log_file = tmp_path / "tool_calls.log"
+    with patch("agent.hooks.LOG_FILE", log_file):
+        log_pre("research_worker", {"question": "x"}, run_id="abc123")
+        content = log_file.read_text()
+    assert "run=abc123" in content
+
+
+def test_log_pre_omits_run_id_when_not_provided(tmp_path):
+    log_file = tmp_path / "tool_calls.log"
+    with patch("agent.hooks.LOG_FILE", log_file):
+        log_pre("web_search", {"query": "x"})
+        content = log_file.read_text()
+    assert "run=" not in content
