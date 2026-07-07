@@ -22,17 +22,26 @@ def test_parse_log_parses_lines_without_run_id(tmp_path):
     assert entries[0]["phase"] == "PRE"
     assert entries[0]["tool"] == "web_search"
     assert entries[0]["run_id"] is None
+    assert entries[0]["agent"] is None
 
 
 def test_get_trace_filters_by_run_id_across_calls(tmp_path):
     log_file = tmp_path / "tool_calls.log"
     with patch("agent.hooks.LOG_FILE", log_file):
-        start_a1 = log_pre("research_worker", {"question": "x"}, run_id="run-a")
-        log_post("research_worker", "answer", start_a1, run_id="run-a")
-        start_b1 = log_pre("notes_worker", {"action": "list"}, run_id="run-b")
-        log_post("notes_worker", "[]", start_b1, run_id="run-b")
-        start_a2 = log_pre("web_search", {"query": "nested call"}, run_id="run-a")
-        log_post("web_search", "nested result", start_a2, run_id="run-a")
+        start_a1 = log_pre(
+            "research_worker", {"question": "x"}, run_id="run-a", agent_name="supervisor"
+        )
+        log_post("research_worker", "answer", start_a1, run_id="run-a", agent_name="supervisor")
+        start_b1 = log_pre(
+            "notes_worker", {"action": "list"}, run_id="run-b", agent_name="supervisor"
+        )
+        log_post("notes_worker", "[]", start_b1, run_id="run-b", agent_name="supervisor")
+        start_a2 = log_pre(
+            "web_search", {"query": "nested call"}, run_id="run-a", agent_name="research_worker"
+        )
+        log_post(
+            "web_search", "nested result", start_a2, run_id="run-a", agent_name="research_worker"
+        )
 
     trace_a = get_trace("run-a", log_file)
     trace_b = get_trace("run-b", log_file)
@@ -45,8 +54,18 @@ def test_get_trace_filters_by_run_id_across_calls(tmp_path):
         "web_search",
         "web_search",
     ]
+    # Proves the full agent graph is captured under one run_id: the supervisor's
+    # own routing decision and the worker's internal nested tool call both appear,
+    # each correctly attributed to the agent that actually made it.
+    assert [entry["agent"] for entry in trace_a] == [
+        "supervisor",
+        "supervisor",
+        "research_worker",
+        "research_worker",
+    ]
     assert len(trace_b) == 2
     assert all(entry["tool"] == "notes_worker" for entry in trace_b)
+    assert all(entry["agent"] == "supervisor" for entry in trace_b)
 
 
 def test_get_trace_returns_empty_for_unknown_run_id(tmp_path):

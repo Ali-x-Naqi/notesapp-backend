@@ -5,7 +5,8 @@ from agent.hooks import LOG_FILE
 
 _LINE_RE = re.compile(
     r"^\[(?P<timestamp>[^\]]+)\] (?P<phase>PRE|POST)\s*\| "
-    r"(?:run=(?P<run_id>\S+) \| )?tool=(?P<tool>\S+) \| (?P<rest>.*)$"
+    r"(?:run=(?P<run_id>\S+) \| )?(?:agent=(?P<agent>\S+) \| )?"
+    r"tool=(?P<tool>\S+) \| (?P<rest>.*)$"
 )
 
 

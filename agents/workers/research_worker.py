@@ -21,5 +21,5 @@ RESEARCH_WORKER_TOOL = {
 
 
 def research_worker(question: str, run_id: str | None = None) -> str:
-    agent = ResearchAgent(memory=SessionMemory(), run_id=run_id)
+    agent = ResearchAgent(memory=SessionMemory(), run_id=run_id, agent_name="research_worker")
     return agent.run(question)

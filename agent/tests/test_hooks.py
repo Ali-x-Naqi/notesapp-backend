@@ -52,3 +52,28 @@ def test_log_pre_omits_run_id_when_not_provided(tmp_path):
         log_pre("web_search", {"query": "x"})
         content = log_file.read_text()
     assert "run=" not in content
+
+
+def test_log_pre_includes_agent_name_when_provided(tmp_path):
+    log_file = tmp_path / "tool_calls.log"
+    with patch("agent.hooks.LOG_FILE", log_file):
+        log_pre("research_worker", {"question": "x"}, agent_name="supervisor")
+        content = log_file.read_text()
+    assert "agent=supervisor" in content
+
+
+def test_log_post_includes_agent_name_when_provided(tmp_path):
+    log_file = tmp_path / "tool_calls.log"
+    with patch("agent.hooks.LOG_FILE", log_file):
+        start = time.monotonic()
+        log_post("web_search", "result", start, agent_name="research_worker")
+        content = log_file.read_text()
+    assert "agent=research_worker" in content
+
+
+def test_log_pre_omits_agent_name_when_not_provided(tmp_path):
+    log_file = tmp_path / "tool_calls.log"
+    with patch("agent.hooks.LOG_FILE", log_file):
+        log_pre("web_search", {"query": "x"})
+        content = log_file.read_text()
+    assert "agent=" not in content

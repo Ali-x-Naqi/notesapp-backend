@@ -68,13 +68,21 @@ class SupervisorAgent:
             for tool_call in tool_calls:
                 args = json.loads(tool_call.function.arguments)
                 worker_fn = WORKER_FUNCTIONS.get(tool_call.function.name)
-                start = log_pre(tool_call.function.name, args, run_id=run_id)
+                start = log_pre(
+                    tool_call.function.name, args, run_id=run_id, agent_name="supervisor"
+                )
                 result = (
                     worker_fn(args, run_id)
                     if worker_fn is not None
                     else f"Error: unknown worker '{tool_call.function.name}'"
                 )
-                log_post(tool_call.function.name, result, start, run_id=run_id)
+                log_post(
+                    tool_call.function.name,
+                    result,
+                    start,
+                    run_id=run_id,
+                    agent_name="supervisor",
+                )
                 messages.append(
                     {
                         "role": "tool",
