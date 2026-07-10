@@ -63,7 +63,7 @@ def test_supervisor_routes_to_notes_worker(mock_notes, mock_groq_cls, mock_confi
     tool_call = _make_tool_call(
         "call_2",
         "notes_worker",
-        {"action": "create", "username": "alice", "title": "Groceries", "body": "Milk"},
+        {"action": "create", "title": "Groceries", "body": "Milk"},
     )
     first = MagicMock(choices=[_make_choice("tool_calls", tool_calls=[tool_call])])
     first.choices[0].message.tool_calls = [tool_call]
@@ -77,9 +77,71 @@ def test_supervisor_routes_to_notes_worker(mock_notes, mock_groq_cls, mock_confi
     result = supervisor.run("Create a note called Groceries with body Milk for alice")
 
     assert "alice" in result
-    mock_notes.assert_called_once_with(
-        action="create", username="alice", title="Groceries", body="Milk"
-    )
+    mock_notes.assert_called_once_with(action="create", title="Groceries", body="Milk")
+
+
+@patch("agents.supervisor.config", return_value="fake-groq-key")
+@patch("agents.supervisor.Groq")
+def test_supervisor_handles_malformed_tool_call_json_gracefully(mock_groq_cls, mock_config):
+    mock_client = MagicMock()
+    mock_groq_cls.return_value = mock_client
+
+    bad_fn = SimpleNamespace(name="research_worker", arguments="{not valid json")
+    bad_tool_call = SimpleNamespace(id="call_bad", function=bad_fn)
+    first = MagicMock(choices=[_make_choice("tool_calls", tool_calls=[bad_tool_call])])
+    first.choices[0].message.tool_calls = [bad_tool_call]
+    second = MagicMock(choices=[_make_choice("stop", content="Recovered from bad tool call.")])
+
+    mock_client.chat.completions.create.side_effect = [first, second]
+
+    supervisor = SupervisorAgent()
+    result = supervisor.run("Some task")
+
+    assert result == "Recovered from bad tool call."
+
+
+@patch("agents.supervisor.config", return_value="fake-groq-key")
+@patch("agents.supervisor.Groq")
+@patch("agents.supervisor.research_worker")
+def test_supervisor_rejects_research_worker_call_missing_question(
+    mock_research, mock_groq_cls, mock_config
+):
+    mock_client = MagicMock()
+    mock_groq_cls.return_value = mock_client
+
+    tool_call = _make_tool_call("call_3", "research_worker", {})
+    first = MagicMock(choices=[_make_choice("tool_calls", tool_calls=[tool_call])])
+    first.choices[0].message.tool_calls = [tool_call]
+    second = MagicMock(choices=[_make_choice("stop", content="Handled missing question.")])
+
+    mock_client.chat.completions.create.side_effect = [first, second]
+
+    supervisor = SupervisorAgent()
+    supervisor.run("Some task")
+
+    mock_research.assert_not_called()
+
+
+@patch("agents.supervisor.config", return_value="fake-groq-key")
+@patch("agents.supervisor.Groq")
+@patch("agents.supervisor.notes_worker")
+def test_supervisor_rejects_notes_worker_create_missing_title(
+    mock_notes, mock_groq_cls, mock_config
+):
+    mock_client = MagicMock()
+    mock_groq_cls.return_value = mock_client
+
+    tool_call = _make_tool_call("call_4", "notes_worker", {"action": "create"})
+    first = MagicMock(choices=[_make_choice("tool_calls", tool_calls=[tool_call])])
+    first.choices[0].message.tool_calls = [tool_call]
+    second = MagicMock(choices=[_make_choice("stop", content="Handled missing title.")])
+
+    mock_client.chat.completions.create.side_effect = [first, second]
+
+    supervisor = SupervisorAgent()
+    supervisor.run("Some task")
+
+    mock_notes.assert_not_called()
 
 
 @patch("agents.supervisor.config", return_value="fake-groq-key")

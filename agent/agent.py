@@ -57,7 +57,19 @@ class ResearchAgent:
             messages.append(choice.message)
 
             for tool_call in tool_calls:
-                args = json.loads(tool_call.function.arguments)
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                except json.JSONDecodeError:
+                    result = "Error: malformed tool-call arguments (invalid JSON)."
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result,
+                        }
+                    )
+                    continue
+
                 tool_fn = TOOL_FUNCTIONS.get(tool_call.function.name)
                 start = log_pre(tool_call.function.name, args)
                 result = (
