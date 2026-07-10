@@ -3,8 +3,6 @@ from unittest.mock import patch
 import pytest
 from django.urls import reverse
 
-from notes.models import Note
-
 
 @pytest.mark.django_db
 def test_post_missing_title_returns_400_with_title_error(client):
