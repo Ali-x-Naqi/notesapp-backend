@@ -17,3 +17,4 @@ media/
 htmlcov/
 .pytest_cache/
 agent/tool_calls.log
+pr_body.md
