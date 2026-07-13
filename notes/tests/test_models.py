@@ -11,6 +11,9 @@ def test_note_str_returns_title():
 
 @pytest.mark.django_db
 def test_note_default_ordering_is_newest_first():
+    # Assumes auto_now_add's microsecond resolution distinguishes these two
+    # back-to-back creates. Acceptable for SQLite/Postgres in practice, but
+    # a coarser-resolution DB backend could make this flaky.
     Note.objects.create(title="First", body="")
     Note.objects.create(title="Second", body="")
     titles = list(Note.objects.values_list("title", flat=True))
