@@ -61,7 +61,45 @@ def test_create_note_missing_title_returns_400(auth_client):
         content_type="application/json",
     )
     assert response.status_code == 400
-    assert "title" in response.json()
+    assert response.json()["title"][0] == "This field is required."
+
+
+@pytest.mark.django_db
+def test_create_note_whitespace_only_title_returns_400(auth_client):
+    # DRF's CharField rejects this before validate_title ever runs (allow_blank=False
+    # + trim_whitespace=True are defaults since the model has no blank=True) - so the
+    # error is DRF's own message, not our custom "Title cannot be blank." string.
+    payload = {"title": "   ", "body": "x"}
+    response = auth_client.post(
+        reverse("note-list"),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    assert response.json()["title"][0] == "This field may not be blank."
+
+
+@pytest.mark.django_db
+def test_create_note_unauthenticated_returns_401(client):
+    payload = {"title": "Anonymous note"}
+    response = client.post(
+        reverse("note-list"),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_create_note_authenticated_attributes_user(auth_client, user):
+    payload = {"title": "Carol's note"}
+    response = auth_client.post(
+        reverse("note-list"),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    assert response.json()["user"] == user.pk
 
 
 @pytest.mark.django_db
@@ -85,14 +123,32 @@ def test_retrieve_missing_note_returns_404(auth_client):
 
 @pytest.mark.django_db
 def test_update_note_returns_200(auth_client, note):
+    original_created_at = note.created_at
+
     payload = {"title": "Updated", "body": "Updated body"}
     response = auth_client.put(
         reverse("note-detail", args=[note.pk]),
         data=json.dumps(payload),
         content_type="application/json",
     )
+
     assert response.status_code == 200
     assert response.json()["title"] == "Updated"
+    note.refresh_from_db()
+    assert note.created_at == original_created_at
+    assert note.updated_at > original_created_at
+
+
+@pytest.mark.django_db
+def test_update_note_missing_title_returns_400(auth_client, note):
+    payload = {"body": "No title on full update"}
+    response = auth_client.put(
+        reverse("note-detail", args=[note.pk]),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    assert "title" in response.json()
 
 
 @pytest.mark.django_db
