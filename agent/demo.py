@@ -4,7 +4,7 @@ from agent.agent import ResearchAgent
 from agent.hooks import LOG_FILE
 from agent.memory import SessionMemory
 
-SAMPLE_FILE = Path(__file__).parent / "sample_topic.txt"
+SAMPLE_FILE = Path(__file__).parent / "workspace" / "sample_topic.txt"
 
 
 def main() -> None:
