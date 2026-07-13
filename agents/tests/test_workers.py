@@ -26,10 +26,10 @@ def test_notes_worker_create_action():
         "agents.workers.notes_worker.create_note",
         return_value="Created note 1: 'Groceries' for alice.",
     ) as mock_create:
-        result = notes_worker(action="create", username="alice", title="Groceries", body="Milk")
+        result = notes_worker(action="create", title="Groceries", body="Milk")
 
     assert "Created note" in result
-    mock_create.assert_called_once_with(username="alice", title="Groceries", body="Milk")
+    mock_create.assert_called_once_with(title="Groceries", body="Milk")
 
 
 def test_notes_worker_unknown_action():

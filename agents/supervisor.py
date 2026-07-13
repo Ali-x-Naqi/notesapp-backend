@@ -13,16 +13,28 @@ MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 WORKER_TOOLS = [RESEARCH_WORKER_TOOL, NOTES_WORKER_TOOL]
 
-WORKER_FUNCTIONS = {
-    "research_worker": lambda args, run_id: research_worker(
-        args.get("question", ""), run_id=run_id
-    ),
-    "notes_worker": lambda args, run_id: notes_worker(
-        action=args.get("action", ""),
-        username=args.get("username", ""),
+
+def _dispatch_research_worker(args: dict, run_id: str) -> str:
+    question = args.get("question", "")
+    if not question:
+        return "Error: research_worker requires a 'question' argument."
+    return research_worker(question, run_id=run_id)
+
+
+def _dispatch_notes_worker(args: dict, run_id: str) -> str:
+    action = args.get("action", "")
+    if action == "create" and not args.get("title"):
+        return "Error: notes_worker 'create' action requires a 'title' argument."
+    return notes_worker(
+        action=action,
         title=args.get("title", ""),
         body=args.get("body", ""),
-    ),
+    )
+
+
+WORKER_FUNCTIONS = {
+    "research_worker": _dispatch_research_worker,
+    "notes_worker": _dispatch_notes_worker,
 }
 
 SYSTEM_PROMPT = (
@@ -66,7 +78,19 @@ class SupervisorAgent:
             messages.append(choice.message)
 
             for tool_call in tool_calls:
-                args = json.loads(tool_call.function.arguments)
+                try:
+                    args = json.loads(tool_call.function.arguments)
+                except json.JSONDecodeError:
+                    result = "Error: malformed tool-call arguments (invalid JSON)."
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result,
+                        }
+                    )
+                    continue
+
                 worker_fn = WORKER_FUNCTIONS.get(tool_call.function.name)
                 start = log_pre(
                     tool_call.function.name, args, run_id=run_id, agent_name="supervisor"

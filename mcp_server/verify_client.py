@@ -11,18 +11,23 @@ if not django_settings.configured:
 from django.contrib.auth.models import User  # noqa: E402
 from mcp import ClientSession, StdioServerParameters  # noqa: E402
 from mcp.client.stdio import stdio_client  # noqa: E402
+from rest_framework_simplejwt.tokens import AccessToken  # noqa: E402
 
 DEMO_USERNAME = "mcp_verify_user"
 
 
-def ensure_demo_user() -> None:
+def get_or_create_demo_token() -> str:
     """Runs before the event loop starts — plain sync Django ORM access."""
-    if not User.objects.filter(username=DEMO_USERNAME).exists():
-        User.objects.create_user(username=DEMO_USERNAME, password="pw")
+    user, _ = User.objects.get_or_create(username=DEMO_USERNAME)
+    return str(AccessToken.for_user(user))
 
 
-async def run_client() -> None:
-    params = StdioServerParameters(command="python", args=["-m", "mcp_server.server"])
+async def run_client(access_token: str) -> None:
+    params = StdioServerParameters(
+        command="python",
+        args=["-m", "mcp_server.server"],
+        env={**os.environ, "MCP_ACCESS_TOKEN": access_token},
+    )
 
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -36,7 +41,7 @@ async def run_client() -> None:
 
             tool_result = await session.call_tool(
                 "create_note",
-                {"username": DEMO_USERNAME, "title": "MCP client verification", "body": "ok"},
+                {"title": "MCP client verification", "body": "ok"},
             )
             print("Tool result:", tool_result.content[0].text)
 
@@ -45,5 +50,5 @@ async def run_client() -> None:
 
 
 if __name__ == "__main__":
-    ensure_demo_user()
-    asyncio.run(run_client())
+    token = get_or_create_demo_token()
+    asyncio.run(run_client(token))

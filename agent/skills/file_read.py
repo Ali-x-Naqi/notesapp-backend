@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from decouple import config
 from pypdf import PdfReader
 
 FILE_READ_TOOL = {
@@ -17,9 +18,36 @@ FILE_READ_TOOL = {
     },
 }
 
+BASE_DIR = Path(config("FILE_READ_ROOT", default="./agent/workspace")).resolve()
+
+
+def _resolve_within_base(path: str) -> Path | None:
+    """Resolve path against BASE_DIR and reject anything that escapes it.
+
+    Handles both relative paths (joined onto BASE_DIR) and absolute paths
+    (checked directly) - pathlib's `/` operator silently discards the left
+    side when the right side is absolute, so an absolute `path` must be
+    checked on its own rather than blindly joined with BASE_DIR first.
+    Symlinks are followed via resolve(), so a symlink pointing outside
+    BASE_DIR is caught by the same relative_to() check.
+    """
+    candidate = Path(path)
+    unresolved = candidate if candidate.is_absolute() else BASE_DIR / candidate
+
+    try:
+        resolved = unresolved.resolve(strict=False)
+        resolved.relative_to(BASE_DIR)
+    except ValueError:
+        return None
+
+    return resolved
+
 
 def file_read(path: str) -> str:
-    file_path = Path(path)
+    file_path = _resolve_within_base(path)
+
+    if file_path is None:
+        return "Error: path is outside the allowed directory."
 
     if not file_path.exists():
         return f"Error: file not found at {path}"
