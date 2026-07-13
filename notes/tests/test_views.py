@@ -54,6 +54,9 @@ def test_create_note_returns_201(auth_client):
 
 @pytest.mark.django_db
 def test_create_note_missing_title_returns_400(auth_client):
+    # Pydantic's NoteInput validates before the DRF serializer ever runs (see
+    # views.py's _pydantic_errors) - so this is Pydantic's own "Field required"
+    # message now, not DRF's "This field is required."
     payload = {"body": "No title here"}
     response = auth_client.post(
         reverse("note-list"),
@@ -61,14 +64,14 @@ def test_create_note_missing_title_returns_400(auth_client):
         content_type="application/json",
     )
     assert response.status_code == 400
-    assert response.json()["title"][0] == "This field is required."
+    assert response.json()["title"][0] == "Field required"
 
 
 @pytest.mark.django_db
 def test_create_note_whitespace_only_title_returns_400(auth_client):
-    # DRF's CharField rejects this before validate_title ever runs (allow_blank=False
-    # + trim_whitespace=True are defaults since the model has no blank=True) - so the
-    # error is DRF's own message, not our custom "Title cannot be blank." string.
+    # Pydantic's NoteInput.title_must_not_be_blank validator now catches this
+    # before DRF's CharField ever sees it - Pydantic prefixes ValueError-raised
+    # custom validator messages with "Value error, ".
     payload = {"title": "   ", "body": "x"}
     response = auth_client.post(
         reverse("note-list"),
@@ -76,7 +79,7 @@ def test_create_note_whitespace_only_title_returns_400(auth_client):
         content_type="application/json",
     )
     assert response.status_code == 400
-    assert response.json()["title"][0] == "This field may not be blank."
+    assert response.json()["title"][0] == "Value error, Title cannot be blank."
 
 
 @pytest.mark.django_db
