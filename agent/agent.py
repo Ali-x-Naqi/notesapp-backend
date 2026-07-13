@@ -21,9 +21,16 @@ TOOL_FUNCTIONS = {
 
 
 class ResearchAgent:
-    def __init__(self, memory: SessionMemory | None = None) -> None:
+    def __init__(
+        self,
+        memory: SessionMemory | None = None,
+        run_id: str | None = None,
+        agent_name: str = "research_agent",
+    ) -> None:
         self.client = Groq(api_key=config("GROQ_API_KEY"))
         self.memory = memory
+        self.run_id = run_id
+        self.agent_name = agent_name
 
     def run(self, question: str) -> str:
         messages: list[dict] = []
@@ -71,13 +78,21 @@ class ResearchAgent:
                     continue
 
                 tool_fn = TOOL_FUNCTIONS.get(tool_call.function.name)
-                start = log_pre(tool_call.function.name, args)
+                start = log_pre(
+                    tool_call.function.name, args, run_id=self.run_id, agent_name=self.agent_name
+                )
                 result = (
                     tool_fn(args)
                     if tool_fn is not None
                     else f"Error: unknown tool '{tool_call.function.name}'"
                 )
-                log_post(tool_call.function.name, result, start)
+                log_post(
+                    tool_call.function.name,
+                    result,
+                    start,
+                    run_id=self.run_id,
+                    agent_name=self.agent_name,
+                )
                 messages.append(
                     {
                         "role": "tool",
