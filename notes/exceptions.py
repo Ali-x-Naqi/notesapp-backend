@@ -11,7 +11,7 @@ def custom_exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
     if response is not None:
         return response
-    logger.exception("Unhandled exception", exc_info=exc)
+    logger.exception("Unhandled exception")
     return Response(
         {"detail": "An unexpected error occurred."},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
