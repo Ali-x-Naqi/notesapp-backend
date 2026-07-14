@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -20,6 +21,13 @@ def _pydantic_errors(exc: PydanticValidationError) -> dict:
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=RegisterSerializer,
+        responses={
+            201: OpenApiResponse(description="JWT tokens + username"),
+            400: OpenApiResponse(description="Validation error"),
+        },
+    )
     def post(self, request):
         try:
             RegisterInput(**request.data)

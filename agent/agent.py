@@ -8,7 +8,7 @@ from agent.memory import SessionMemory
 from agent.skills.web_search import WEB_SEARCH_TOOL, web_search
 
 MAX_ITERATIONS = 5
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 class ResearchAgent:

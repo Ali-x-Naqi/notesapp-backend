@@ -11,3 +11,4 @@ pytest-django>=4.8
 ruff>=0.5
 groq>=0.9
 google-search-results>=2.4
+drf-spectacular>=0.27

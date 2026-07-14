@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -22,6 +23,7 @@ def _pydantic_errors(exc: PydanticValidationError) -> dict:
 class NoteListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses=NoteSerializer(many=True))
     def get(self, request):
         if request.user.profile.is_admin:
             notes = Note.objects.select_related("user").all()
@@ -29,6 +31,10 @@ class NoteListView(APIView):
             notes = Note.objects.select_related("user").filter(user=request.user)
         return Response(NoteSerializer(notes, many=True).data)
 
+    @extend_schema(
+        request=NoteSerializer,
+        responses={201: NoteSerializer, 400: OpenApiResponse(description="Validation error")},
+    )
     def post(self, request):
         try:
             note_input = NoteInput(**request.data)
@@ -51,6 +57,7 @@ class NoteDetailView(APIView):
         except Note.DoesNotExist:
             return None
 
+    @extend_schema(responses={200: NoteSerializer, 404: OpenApiResponse(description="Not found")})
     def get(self, request, pk):
         note = self._get_note(pk)
         if note is None:
@@ -58,6 +65,14 @@ class NoteDetailView(APIView):
         self.check_object_permissions(request, note)
         return Response(NoteSerializer(note).data)
 
+    @extend_schema(
+        request=NoteSerializer,
+        responses={
+            200: NoteSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            404: OpenApiResponse(description="Not found"),
+        },
+    )
     def put(self, request, pk):
         note = self._get_note(pk)
         if note is None:
@@ -73,6 +88,14 @@ class NoteDetailView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    @extend_schema(
+        request=NoteSerializer,
+        responses={
+            200: NoteSerializer,
+            400: OpenApiResponse(description="Validation error"),
+            404: OpenApiResponse(description="Not found"),
+        },
+    )
     def patch(self, request, pk):
         note = self._get_note(pk)
         if note is None:
@@ -84,6 +107,7 @@ class NoteDetailView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    @extend_schema(responses={204: None, 404: OpenApiResponse(description="Not found")})
     def delete(self, request, pk):
         note = self._get_note(pk)
         if note is None:

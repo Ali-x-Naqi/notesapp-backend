@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 from agent.agent import ResearchAgent
 from agent.memory import SessionMemory
 
-
 # --- SessionMemory unit tests ---
 
 
