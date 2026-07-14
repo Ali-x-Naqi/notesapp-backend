@@ -16,3 +16,4 @@ media/
 .coverage
 htmlcov/
 .pytest_cache/
+agent/tool_calls.log

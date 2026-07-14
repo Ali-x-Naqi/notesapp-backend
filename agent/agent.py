@@ -4,6 +4,7 @@ import sys
 from decouple import config
 from groq import Groq
 
+from agent.hooks import log_post, log_pre
 from agent.memory import SessionMemory
 from agent.skills.web_search import WEB_SEARCH_TOOL, web_search
 
@@ -49,7 +50,9 @@ class ResearchAgent:
 
             for tool_call in tool_calls:
                 args = json.loads(tool_call.function.arguments)
+                start = log_pre(tool_call.function.name, args)
                 result = web_search(args.get("query", ""))
+                log_post(tool_call.function.name, result, start)
                 messages.append(
                     {
                         "role": "tool",
